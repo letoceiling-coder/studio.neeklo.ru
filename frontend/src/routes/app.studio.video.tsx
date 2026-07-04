@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentPlan } from "@/lib/plans";
-import { tryGenerate, useFreeCredits } from "@/lib/mock-credits";
+import { tryGenerate, refundCredits, useFreeCredits } from "@/lib/mock-credits";
 import { GenerationCostNote } from "@/components/generation-cost-note";
 import { ModelPickerModal } from "@/components/studio";
 import {
@@ -239,6 +239,7 @@ function VideoStudio() {
         setProgress(100);
         toast.success("Видео готово");
       } else {
+        refundCredits(totalCost);
         setPhase("error");
         const msg = friendlyError(result.error);
         setError(msg);
@@ -246,6 +247,7 @@ function VideoStudio() {
       }
     } catch (err) {
       stopEta();
+      refundCredits(totalCost);
       setPhase("error");
       const msg = friendlyError(err instanceof Error ? err.message : undefined);
       setError(msg);

@@ -31,7 +31,7 @@ import {
   type ToolTab,
 } from "@/components/studio";
 import { addMedia, listMedia, pickGradient, useMediaList } from "@/lib/media-store";
-import { tryGenerate } from "@/lib/mock-credits";
+import { tryGenerate, refundCredits } from "@/lib/mock-credits";
 import preset1 from "@/assets/preset-1.jpg";
 import preset2 from "@/assets/preset-2.jpg";
 import preset3 from "@/assets/preset-3.jpg";
@@ -186,7 +186,7 @@ function EnhancerStudio() {
       return;
     }
     if (status === "processing") return;
-    if (!tryGenerate(2)) return;
+    if (!tryGenerate(MODES[mode].cost)) return;
     setStatus("processing");
     setProgress(0);
     setResult(null);
@@ -201,9 +201,10 @@ function EnhancerStudio() {
       if (pct >= 100) {
         if (timerRef.current) window.clearInterval(timerRef.current);
         if (failure) {
+          refundCredits(MODES[mode].cost);
           setStatus("error");
           toast.error("Не удалось обработать", {
-            description: "Кредиты не списались. Попробуйте ещё раз.",
+            description: "Кредиты возвращены. Попробуйте ещё раз.",
           });
           return;
         }

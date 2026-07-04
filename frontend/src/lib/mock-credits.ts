@@ -169,6 +169,16 @@ export function addFreeCredits(n: number): number {
   return next;
 }
 
+/**
+ * Возврат кредитов при ошибке генерации (ТЗ §2.5: «кредит за упавшую возвращён»).
+ * В server-режиме кредитами управляет backend (резерв/возврат + ре-гидрация),
+ * поэтому локально возвращаем ТОЛЬКО в free-режиме, чтобы не задваивать.
+ */
+export function refundCredits(n: number): void {
+  if (getCreditsMode() !== "free") return;
+  addFreeCredits(Math.max(0, Math.floor(n)));
+}
+
 /** «Напомнить завтра» — отложить пейволл до сброса лимита. */
 export function snoozePaywallUntilTomorrow() {
   try {

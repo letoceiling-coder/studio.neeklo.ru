@@ -3,7 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Loader2, Sparkles, AlertCircle } from "lucide-react";
 import { tools } from "./app.tools.index";
-import { tryGenerate } from "@/lib/mock-credits";
+import { tryGenerate, refundCredits } from "@/lib/mock-credits";
 import { CreditCost } from "@/components/credit-cost";
 import { GenerationCostNote } from "@/components/generation-cost-note";
 import { MediaActions } from "@/components/media-actions";
@@ -68,6 +68,7 @@ function ToolPage() {
           window.clearInterval(tick);
           // tiny chance of mock failure for visible error state
           if (Math.random() < 0.06) {
+            refundCredits(1);
             setPhase("error");
             return 100;
           }

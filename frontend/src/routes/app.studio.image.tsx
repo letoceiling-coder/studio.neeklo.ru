@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentPlan } from "@/lib/plans";
-import { tryGenerate, useFreeCredits } from "@/lib/mock-credits";
+import { tryGenerate, refundCredits, useFreeCredits } from "@/lib/mock-credits";
 import { GenerationCostNote } from "@/components/generation-cost-note";
 import { ModelPickerModal } from "@/components/studio";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -178,12 +178,14 @@ function ImageStudio() {
       if (result.status === "completed" && result.assetUrl) {
         addShot(basePrompt, result.assetUrl);
       } else {
+        refundCredits(totalCost);
         setStatus("error");
         const msg = friendlyError(result.error);
         setError(msg);
         toast.error("Не удалось сгенерировать", { description: msg });
       }
     } catch (err) {
+      refundCredits(totalCost);
       setStatus("error");
       const msg = friendlyError(err instanceof Error ? err.message : undefined);
       setError(msg);
