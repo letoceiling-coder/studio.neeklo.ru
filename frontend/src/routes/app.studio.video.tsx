@@ -28,6 +28,7 @@ import {
   videoModels,
   getModel,
   validateBeforeGenerate,
+  computeVideoCost,
   formatEta,
   type MediaModel,
   type ModelContext,
@@ -150,9 +151,7 @@ function VideoStudio() {
     freeAvailable: balance > 0,
   };
 
-  const durFactor = duration >= 10 ? 1.6 : duration >= 8 ? 1.3 : 1;
-  const resFactor = resolution === "1080p" ? 1.5 : 1;
-  const totalCost = Math.max(1, Math.round(model.costCredits * durFactor * resFactor));
+  const totalCost = computeVideoCost(model, { duration, resolution });
 
   const validation = validateBeforeGenerate(model, ctx, {
     promptFilled: prompt.trim().length > 0,
@@ -331,7 +330,7 @@ function VideoStudio() {
       {/* двухколоночная рабочая зона */}
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] gap-4 overflow-hidden">
         {/* левая панель создания */}
-        <aside className="min-h-0 overflow-y-auto pb-28 lg:pb-4 flex flex-col gap-4 order-2 lg:order-1">
+        <aside className="min-w-0 min-h-0 overflow-y-auto pb-28 lg:pb-4 flex flex-col gap-4 order-2 lg:order-1">
           {/* входные данные */}
           {mode !== "t2v" && (
             <Section title="Входные данные">
@@ -408,6 +407,12 @@ function VideoStudio() {
 
           {/* cost + CTA (desktop) */}
           <div className="hidden lg:flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2 rounded-tile border border-border bg-surface-1 px-3 py-2.5">
+              <span className="text-[12px] text-muted-foreground">Стоимость видео</span>
+              <span className="text-[18px] font-bold tabular-nums leading-none" style={{ color: "var(--accent)" }}>
+                {totalCost} кр
+              </span>
+            </div>
             <GenerationCostNote cost={totalCost} />
             {!validation.ok && validation.message && (
               <div className="text-[12px] text-amber-500">{validation.message}</div>
@@ -426,7 +431,7 @@ function VideoStudio() {
         </aside>
 
         {/* центр */}
-        <main className="min-h-0 overflow-y-auto pb-28 lg:pb-4 order-1 lg:order-2">
+        <main className="min-w-0 min-h-0 overflow-y-auto pb-28 lg:pb-4 order-1 lg:order-2">
           {phase === "ready" && resultUrl ? (
             <ResultView url={resultUrl} poster={startFrame} format={format} onRegenerate={startGenerate} />
           ) : busy ? (
@@ -649,16 +654,16 @@ function FrameBox({ label, src, onUpload, onClear }: { label: string; src?: stri
 
 function ParamRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-1">
+    <div className="flex items-center justify-between gap-2 py-1 min-w-0">
       <span className="text-[12.5px] text-muted-foreground shrink-0">{label}</span>
-      <div className="min-w-0 overflow-x-auto">{children}</div>
+      <div className="min-w-0 flex justify-end">{children}</div>
     </div>
   );
 }
 
 function Seg({ options, value, onChange, suffix }: { options: string[]; value: string; onChange: (v: string) => void; suffix?: string }) {
   return (
-    <div className="inline-flex items-center gap-1 p-1 rounded-tile border border-border bg-surface-1">
+    <div className="flex flex-wrap justify-end items-center gap-1 p-1 rounded-tile border border-border bg-surface-1 min-w-0">
       {options.map((o) => {
         const active = o === value;
         return (

@@ -1,10 +1,11 @@
 // ModelPickerModal — выбор медиа-модели карточками (ТЗ §6).
 // Табы-категории, поиск, бейджи возможностей, стоимость, ETA, причины недоступности.
 import { useMemo, useState } from "react";
-import { Check, Search, X, Zap, Crown, Clock, Coins, Lock } from "lucide-react";
+import { Check, Search, X, Zap, Crown, Clock, Coins, Lock, Sparkles } from "lucide-react";
 import {
   modelsForKind,
   modelAvailability,
+  modelAccentLine,
   formatEta,
   formatCost,
   CAPABILITY_LABEL,
@@ -157,24 +158,36 @@ export function ModelCard({
   onSelect: () => void;
 }) {
   const { available, reason } = modelAvailability(model, ctx);
+  const accentLine = modelAccentLine(model);
+
+  const goToBilling = () => {
+    if (typeof window !== "undefined") {
+      window.location.href = `/app/billing?tier=${model.tier}`;
+    }
+  };
 
   return (
     <div
       className={`relative flex flex-col rounded-tile border bg-surface-1 overflow-hidden transition-studio ${
         selected ? "border-accent" : "border-border"
-      } ${available ? "" : "opacity-70"}`}
+      } ${available ? "" : "opacity-80"}`}
       style={selected ? { boxShadow: "var(--shadow-warm)" } : undefined}
     >
+      {/* акцентная линия по тарифу (ТЗ §4.2) */}
+      {accentLine && <div className="h-1 w-full shrink-0" style={{ background: accentLine }} />}
+
       {/* preview */}
       <div className={`relative h-20 bg-gradient-to-br ${model.previewGradient}`}>
         <div className="absolute inset-0 bg-black/10" />
-        <div className="absolute top-2 left-2 flex gap-1">
+        <div className="absolute top-2 left-2 flex flex-wrap gap-1">
           {model.capabilities.includes("fast") && (
             <Badge icon={Zap} label="Fast" />
           )}
           {model.capabilities.includes("pro") && (
             <Badge icon={Crown} label="Pro" />
           )}
+          {model.isNew && <Badge icon={Sparkles} label="NEW" />}
+          {model.tier === "premium" && <Badge icon={Crown} label="PREMIUM" />}
         </div>
         {selected && (
           <span className="absolute top-2 right-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-accent text-accent-foreground">
@@ -237,9 +250,14 @@ export function ModelCard({
               {selected ? "Выбрана" : "Выбрать"}
             </button>
           ) : (
-            <div className="inline-flex items-center gap-1.5 w-full justify-center h-9 rounded-tile border border-border bg-surface-2 text-[12px] text-muted-foreground">
+            <button
+              type="button"
+              onClick={goToBilling}
+              title="Открыть тарифы"
+              className="inline-flex items-center gap-1.5 w-full justify-center h-9 rounded-tile border border-border bg-surface-2 hover:bg-surface-3 hover:border-accent/50 text-[12px] text-muted-foreground transition-studio"
+            >
               <Lock className="w-3.5 h-3.5" strokeWidth={1.8} /> {reason}
-            </div>
+            </button>
           )}
         </div>
       </div>

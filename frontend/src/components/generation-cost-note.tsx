@@ -3,6 +3,8 @@ import { Sparkles, Clock, Crown, BellRing } from "lucide-react";
 import {
   useFreeCredits,
   useTimeUntilFreeReset,
+  useCreditsMode,
+  creditNoun,
   snoozePaywallUntilTomorrow,
 } from "@/lib/mock-credits";
 import { toast } from "sonner";
@@ -24,7 +26,8 @@ export function GenerationCostNote({
 }) {
   const left = useFreeCredits();
   const { label } = useTimeUntilFreeReset();
-  const word = creditWord(cost);
+  const mode = useCreditsMode();
+  const isFree = mode === "free";
 
   if (left >= cost) {
     return (
@@ -34,10 +37,19 @@ export function GenerationCostNote({
       >
         <span className="inline-flex items-center gap-1.5">
           <Sparkles className="w-3 h-3 text-accent" strokeWidth={2.4} />
-          Будет использована {cost === 1 ? "1 бесплатная генерация" : `${cost} ${word}`}
+          Спишется {cost} {creditNoun(cost)}
         </span>
         <span className="text-border">·</span>
-        <span className="tabular-nums">осталось {left} из 3</span>
+        <span className="tabular-nums">осталось {left} {creditNoun(left)}</span>
+        {isFree && (
+          <>
+            <span className="text-border">·</span>
+            <span className="inline-flex items-center gap-1 tabular-nums">
+              <Clock className="w-3 h-3" strokeWidth={2} />
+              Free обновится через {label}
+            </span>
+          </>
+        )}
       </div>
     );
   }
@@ -93,12 +105,4 @@ export function GenerationCostNote({
       </div>
     </div>
   );
-}
-
-function creditWord(n: number) {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "генерация";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "генерации";
-  return "генераций";
 }

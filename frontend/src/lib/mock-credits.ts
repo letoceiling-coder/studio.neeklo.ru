@@ -21,6 +21,31 @@ function isServerMode(): boolean {
   }
 }
 
+/** Режим кошелька: "free" — дневные бесплатные генерации, "server" — реальные кредиты с backend. */
+export type CreditsMode = "free" | "server";
+
+export function getCreditsMode(): CreditsMode {
+  return isServerMode() ? "server" : "free";
+}
+
+/** Реактивно следит за режимом кошелька (free/server). */
+export function useCreditsMode(): CreditsMode {
+  return useSyncExternalStore(
+    subscribe,
+    () => getCreditsMode(),
+    () => "free" as CreditsMode,
+  );
+}
+
+/** Правильное склонение слова «кредит». */
+export function creditNoun(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "кредит";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "кредита";
+  return "кредитов";
+}
+
 /** Сколько бесплатных генераций даём каждый день. */
 export const DAILY_FREE_LIMIT = 3;
 

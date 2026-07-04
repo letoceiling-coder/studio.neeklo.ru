@@ -17,6 +17,8 @@ import {
   MoreHorizontal,
   X,
   Camera,
+  Star,
+  Boxes,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentPlan } from "@/lib/plans";
@@ -28,9 +30,12 @@ import {
   imageModels,
   getModel,
   validateBeforeGenerate,
+  computeImageCost,
+  IMAGE_QUALITY_OPTIONS,
   formatEta,
   type MediaModel,
   type ModelContext,
+  type ImageQuality,
 } from "@/lib/media-models";
 
 export const Route = createFileRoute("/app/studio/image")({
@@ -47,7 +52,6 @@ export const Route = createFileRoute("/app/studio/image")({
 
 type Status = "idle" | "loading" | "ready" | "error";
 type Count = 1 | 2 | 4;
-type Quality = "fast" | "standard" | "max";
 
 type Shot = {
   id: string;
@@ -56,13 +60,8 @@ type Shot = {
   modelName: string;
   ratio: string;
   createdAt: number;
+  favorite?: boolean;
 };
-
-const QUALITY: { id: Quality; label: string }[] = [
-  { id: "fast", label: "Быстро" },
-  { id: "standard", label: "Стандарт" },
-  { id: "max", label: "Максимум" },
-];
 
 const PRESETS: { label: string; prompt: string; ratio: string }[] = [
   { label: "Товарный кадр", prompt: "Продуктовая съёмка товара на чистом фоне, мягкий студийный свет, высокая детализация", ratio: "1:1" },
@@ -106,7 +105,7 @@ function ImageStudio() {
   const [prompt, setPrompt] = useState("");
   const [format, setFormat] = useState<string>(model.aspectRatios[0] ?? "1:1");
   const [count, setCount] = useState<Count>(1);
-  const [quality, setQuality] = useState<Quality>("standard");
+  const [quality, setQuality] = useState<ImageQuality>("standard");
   const [negative, setNegative] = useState("");
   const [seed, setSeed] = useState("");
 
@@ -134,7 +133,7 @@ function ImageStudio() {
     freeAvailable: balance > 0,
   };
 
-  const totalCost = model.costCredits * count;
+  const totalCost = computeImageCost(model, count, quality);
   const promptFilled = prompt.trim().length > 0;
   const validation = validateBeforeGenerate(model, ctx, { promptFilled });
   const canGenerate = validation.ok && status !== "loading";
@@ -238,6 +237,19 @@ function ImageStudio() {
     }
     window.location.href = "/app/studio/video";
   };
+  const toggleFavorite = (s: Shot) => {
+    setShots((arr) => arr.map((x) => (x.id === s.id ? { ...x, favorite: !x.favorite } : x)));
+    toast.success(s.favorite ? "Убрано из избранного" : "Добавлено в избранное");
+  };
+  const openInNodes = (s: Shot) => {
+    try {
+      sessionStorage.setItem("neeklo.nodes.seedImage", s.src);
+      sessionStorage.setItem("neeklo.nodes.seedPrompt", s.prompt);
+    } catch {
+      /* ignore */
+    }
+    window.location.href = "/app/nodes";
+  };
 
   const applyPreset = (p: (typeof PRESETS)[number]) => {
     setPrompt(p.prompt);
@@ -302,6 +314,8 @@ function ImageStudio() {
             onReuse={reusePrompt}
             onMakeVideo={makeVideo}
             onRegenerate={startGenerate}
+            onFavorite={toggleFavorite}
+            onOpenInNodes={openInNodes}
           />
         )}
       </div>
@@ -463,6 +477,7 @@ function ErrorState({ message, onRetry }: { message: string | null; onRetry: () 
 
 function ResultGrid({
   shots, loading, progress, onOpen, onDownload, onCopy, onReuse, onMakeVideo, onRegenerate,
+  onFavorite, onOpenInNodes,
 }: {
   shots: Shot[];
   loading: boolean;
@@ -473,6 +488,8 @@ function ResultGrid({
   onReuse: (s: Shot) => void;
   onMakeVideo: (s: Shot) => void;
   onRegenerate: () => void;
+  onFavorite: (s: Shot) => void;
+  onOpenInNodes: (s: Shot) => void;
 }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -487,10 +504,25 @@ function ResultGrid({
           <img src={s.src} alt={s.prompt} loading="lazy" className="w-full h-full object-cover" />
           {/* hover actions */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+          {/* избранное — видно всегда, если помечено */}
+          <button
+            type="button"
+            onClick={() => onFavorite(s)}
+            title={s.favorite ? "В избранном" : "В избранное"}
+            aria-label={s.favorite ? "Убрать из избранного" : "В избранное"}
+            className={`absolute top-2 left-2 inline-flex items-center justify-center w-8 h-8 rounded-full backdrop-blur-sm transition-all ${
+              s.favorite
+                ? "bg-black/55 text-amber-400 opacity-100"
+                : "bg-black/55 text-white opacity-0 group-hover:opacity-100 hover:bg-black/75"
+            }`}
+          >
+            <Star className="w-4 h-4" strokeWidth={1.9} fill={s.favorite ? "currentColor" : "none"} />
+          </button>
           <div className="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <ActionBtn icon={Maximize2} label="Открыть" onClick={() => onOpen(s)} />
             <ActionBtn icon={Download} label="Скачать" onClick={() => onDownload(s)} />
             <ActionBtn icon={Film} label="Сделать видео" onClick={() => onMakeVideo(s)} />
+            <ActionBtn icon={Boxes} label="Открыть в нодах" onClick={() => onOpenInNodes(s)} />
             <ActionBtn icon={Wand2} label="Повторить промпт" onClick={() => onReuse(s)} />
             <ActionBtn icon={Copy} label="Копировать промпт" onClick={() => onCopy(s)} />
             <ActionBtn icon={RotateCw} label="Повторить генерацию" onClick={onRegenerate} />
@@ -535,8 +567,8 @@ function Composer({
   setFormat: (v: string) => void;
   count: Count;
   setCount: (v: Count) => void;
-  quality: Quality;
-  setQuality: (v: Quality) => void;
+  quality: ImageQuality;
+  setQuality: (v: ImageQuality) => void;
   onOpenSettings: () => void;
   totalCost: number;
   loading: boolean;
@@ -590,8 +622,8 @@ function Composer({
             {/* quality */}
             <ChipSelect
               value={quality}
-              options={QUALITY}
-              onChange={(v) => setQuality(v as Quality)}
+              options={IMAGE_QUALITY_OPTIONS}
+              onChange={(v) => setQuality(v as ImageQuality)}
             />
 
             {/* settings */}

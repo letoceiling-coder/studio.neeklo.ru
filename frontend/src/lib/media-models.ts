@@ -49,6 +49,8 @@ export type MediaModel = {
   tier: ModelTier;
   /** Минимальный rank тарифа (см. plans.ts: free=0 … business=4). */
   requiredTier: number;
+  /** Показывать бейдж NEW на карточке. */
+  isNew?: boolean;
   costCredits: number;
   etaSeconds: number;
   inputModes: InputMode[];
@@ -85,7 +87,7 @@ export const MEDIA_MODELS: MediaModel[] = [
     costCredits: 2,
     etaSeconds: 12,
     inputModes: ["text"],
-    aspectRatios: ["1:1", "4:5", "9:16", "16:9"],
+    aspectRatios: ["1:1", "3:4", "4:3", "9:16", "16:9"],
     capabilities: ["text", "fast"],
     rateLimit: { rpm: 6, concurrency: 1 },
     categories: ["recommended", "image", "fast", "economy"],
@@ -102,7 +104,7 @@ export const MEDIA_MODELS: MediaModel[] = [
     costCredits: 6,
     etaSeconds: 25,
     inputModes: ["text", "reference"],
-    aspectRatios: ["1:1", "4:5", "3:4", "9:16", "16:9"],
+    aspectRatios: ["1:1", "3:4", "4:3", "9:16", "16:9", "21:9"],
     capabilities: ["text", "reference"],
     rateLimit: { rpm: 6, concurrency: 1 },
     categories: ["recommended", "image"],
@@ -116,10 +118,11 @@ export const MEDIA_MODELS: MediaModel[] = [
     previewGradient: "from-violet-500 via-fuchsia-400 to-pink-300",
     tier: "standard",
     requiredTier: 1,
+    isNew: true,
     costCredits: 8,
     etaSeconds: 30,
     inputModes: ["text", "reference"],
-    aspectRatios: ["1:1", "4:5", "9:16", "16:9"],
+    aspectRatios: ["1:1", "3:4", "4:3", "9:16", "16:9"],
     capabilities: ["text", "reference"],
     categories: ["image", "quality"],
   },
@@ -135,7 +138,7 @@ export const MEDIA_MODELS: MediaModel[] = [
     costCredits: 14,
     etaSeconds: 55,
     inputModes: ["text", "reference"],
-    aspectRatios: ["1:1", "4:5", "3:4", "9:16", "16:9"],
+    aspectRatios: ["1:1", "3:4", "4:3", "9:16", "16:9", "21:9"],
     capabilities: ["text", "reference", "pro"],
     requires: { proPlan: true },
     categories: ["image", "quality", "premium"],
@@ -152,7 +155,7 @@ export const MEDIA_MODELS: MediaModel[] = [
     costCredits: 20,
     etaSeconds: 70,
     inputModes: ["text", "reference"],
-    aspectRatios: ["1:1", "4:5", "16:9"],
+    aspectRatios: ["1:1", "4:3", "16:9"],
     capabilities: ["text", "reference", "pro", "lora"],
     requires: { proPlan: true },
     limits: ["LoRA доступна со «Студии»"],
@@ -207,6 +210,7 @@ export const MEDIA_MODELS: MediaModel[] = [
     previewGradient: "from-sky-500 via-indigo-400 to-violet-300",
     tier: "pro",
     requiredTier: 2,
+    isNew: true,
     costCredits: 18,
     etaSeconds: 130,
     inputModes: ["startFrame", "endFrame"],
@@ -250,6 +254,51 @@ export function getModel(id: string): MediaModel | undefined {
 
 export function modelsForKind(kind: MediaKind): MediaModel[] {
   return MEDIA_MODELS.filter((m) => m.kind === kind);
+}
+
+/* ────────── единая формула стоимости (ТЗ §7) ──────────
+   Цена всегда считается здесь: базовая цена модели × количество ×
+   коэффициент качества (+ для видео коэффициент длительности/разрешения).
+   Экраны и модалка НЕ считают цену сами. */
+
+export type ImageQuality = "standard" | "high";
+
+export const IMAGE_QUALITY_OPTIONS: { id: ImageQuality; label: string }[] = [
+  { id: "standard", label: "Стандарт" },
+  { id: "high", label: "Высокое" },
+];
+
+const IMAGE_QUALITY_FACTOR: Record<ImageQuality, number> = {
+  standard: 1,
+  high: 1.5,
+};
+
+/** Стоимость генерации изображения: цена × количество × качество. */
+export function computeImageCost(
+  model: MediaModel,
+  count: number,
+  quality: ImageQuality,
+): number {
+  return Math.max(1, Math.round(model.costCredits * count * IMAGE_QUALITY_FACTOR[quality]));
+}
+
+/** Стоимость генерации видео: цена × длительность × разрешение. */
+export function computeVideoCost(
+  model: MediaModel,
+  opts: { duration: number; resolution: string },
+): number {
+  const durFactor = opts.duration >= 10 ? 1.6 : opts.duration >= 8 ? 1.3 : 1;
+  const resFactor = opts.resolution === "1080p" ? 1.5 : 1;
+  return Math.max(1, Math.round(model.costCredits * durFactor * resFactor));
+}
+
+/** Цвет акцентной линии карточки по тарифу (ТЗ §4.2): обычная / фиолетовая у Art / золотая у Pro. */
+export function modelAccentLine(model: MediaModel): string | undefined {
+  if (model.id.includes("art")) return "linear-gradient(90deg, #8b5cf6, #d946ef)";
+  if (model.tier === "pro" || model.tier === "premium") {
+    return "linear-gradient(90deg, #f59e0b, #fde047)";
+  }
+  return undefined;
 }
 
 /* ────────── доступность / валидация ────────── */

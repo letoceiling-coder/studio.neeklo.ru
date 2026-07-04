@@ -4,6 +4,8 @@ import { Sparkles, Clock, Crown, ChevronRight, Check } from "lucide-react";
 import {
   useFreeCredits,
   useTimeUntilFreeReset,
+  useCreditsMode,
+  creditNoun,
   DAILY_FREE_LIMIT,
   FREE_PERKS,
 } from "@/lib/mock-credits";
@@ -32,6 +34,8 @@ function MiniRing({ used, total }: { used: number; total: number }) {
 export function CreditsBadge({ onUseNow }: { onUseNow?: () => void }) {
   const left = useFreeCredits();
   const { label: refreshLabel } = useTimeUntilFreeReset();
+  const mode = useCreditsMode();
+  const isFree = mode === "free";
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -57,21 +61,34 @@ export function CreditsBadge({ onUseNow }: { onUseNow?: () => void }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label={`Бесплатных генераций сегодня: ${left} из ${DAILY_FREE_LIMIT}. Обновятся через ${refreshLabel}.`}
+        aria-label={
+          isFree
+            ? `Бесплатных генераций сегодня: ${left} из ${DAILY_FREE_LIMIT}. Обновятся через ${refreshLabel}.`
+            : `Осталось ${left} ${creditNoun(left)}.`
+        }
         aria-expanded={open}
         className="inline-flex items-center gap-2 h-10 sm:h-9 pl-1.5 pr-2.5 sm:pr-3 rounded-full border border-border bg-card hover:bg-surface-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <MiniRing used={used} total={DAILY_FREE_LIMIT} />
         <span className="hidden sm:inline-flex flex-col items-start leading-tight">
-          <span className="text-[12px] font-semibold tabular-nums">
-            {left}
-            <span className="text-muted-foreground font-medium">/{DAILY_FREE_LIMIT}</span>
-            <span className="ml-1 text-muted-foreground font-medium">бесплатно</span>
-          </span>
-          <span className="text-[10.5px] text-muted-foreground inline-flex items-center gap-0.5 tabular-nums">
-            <Clock className="w-2.5 h-2.5" strokeWidth={2} />
-            через {refreshLabel}
-          </span>
+          {isFree ? (
+            <>
+              <span className="text-[12px] font-semibold tabular-nums">
+                {left}
+                <span className="text-muted-foreground font-medium">/{DAILY_FREE_LIMIT}</span>
+                <span className="ml-1 text-muted-foreground font-medium">бесплатно</span>
+              </span>
+              <span className="text-[10.5px] text-muted-foreground inline-flex items-center gap-0.5 tabular-nums">
+                <Clock className="w-2.5 h-2.5" strokeWidth={2} />
+                через {refreshLabel}
+              </span>
+            </>
+          ) : (
+            <span className="text-[12px] font-semibold tabular-nums">
+              {left}
+              <span className="ml-1 text-muted-foreground font-medium">{creditNoun(left)}</span>
+            </span>
+          )}
         </span>
       </button>
 
@@ -91,14 +108,18 @@ export function CreditsBadge({ onUseNow }: { onUseNow?: () => void }) {
             </span>
             <div className="min-w-0">
               <div className="text-[15px] font-bold tracking-tight">
-                {empty
-                  ? "Бесплатные на сегодня закончились"
-                  : `${left} из ${DAILY_FREE_LIMIT} бесплатных сегодня`}
+                {isFree
+                  ? empty
+                    ? "Бесплатные на сегодня закончились"
+                    : `${left} из ${DAILY_FREE_LIMIT} бесплатных сегодня`
+                  : `Осталось ${left} ${creditNoun(left)}`}
               </div>
-              <div className="mt-0.5 text-[12px] text-muted-foreground inline-flex items-center gap-1 tabular-nums">
-                <Clock className="w-3 h-3" strokeWidth={2} />
-                Обновятся через {refreshLabel}
-              </div>
+              {isFree && (
+                <div className="mt-0.5 text-[12px] text-muted-foreground inline-flex items-center gap-1 tabular-nums">
+                  <Clock className="w-3 h-3" strokeWidth={2} />
+                  Обновятся через {refreshLabel}
+                </div>
+              )}
             </div>
           </div>
 
