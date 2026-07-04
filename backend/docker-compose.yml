@@ -1,0 +1,51 @@
+# Local dev stack for studio.neeklo.ru backend
+# Production ports on VPS: postgres 5435, redis 6383, api 3016, frontend 3000
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: studio
+      POSTGRES_PASSWORD: studio
+      POSTGRES_DB: studio_neeklo
+    ports:
+      - "5435:5432"
+    volumes:
+      - studio_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studio -d studio_neeklo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6383:6379"
+    volumes:
+      - studio_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: studio
+      MINIO_ROOT_PASSWORD: studio-secret-key
+    ports:
+      - "9010:9000"
+      - "9011:9001"
+    volumes:
+      - studio_minio:/data
+
+volumes:
+  studio_postgres:
+  studio_redis:
+  studio_minio:

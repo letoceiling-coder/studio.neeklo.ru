@@ -1,0 +1,25 @@
+{
+  "name": "studio-neeklo-backend",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w @studio/api",
+    "dev:worker": "npm run dev -w @studio/worker",
+    "build": "npm run build -w @studio/shared -w @studio/neeklo-sdk -w @studio/api -w @studio/worker",
+    "db:generate": "prisma generate --schema=prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
+    "db:push": "prisma db push --schema=prisma/schema.prisma",
+    "lint": "npm run lint -w @studio/api --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5",
+    "prisma": "^6.9.0",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,256 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  --font-sans: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+:root {
+  --radius: 1rem;
+
+  /* layered surfaces — deeper blacks, premium graphite */
+  --background: oklch(0.155 0.004 260);
+  --surface-1: oklch(0.185 0.005 260);
+  --surface-2: oklch(0.215 0.006 260);
+  --surface-3: oklch(0.255 0.007 260);
+
+  --card: var(--surface-1);
+  --card-foreground: oklch(0.98 0.003 260);
+  --muted: var(--surface-2);
+  --muted-foreground: oklch(0.66 0.012 260);
+
+  --foreground: oklch(0.98 0.003 260);
+  --foreground-dim: oklch(0.78 0.008 260);
+
+  --border: oklch(0.42 0.008 260 / 0.18);
+  --border-strong: oklch(0.55 0.008 260 / 0.32);
+
+  /* coral-amber accent system */
+  --accent: oklch(0.76 0.16 42);
+  --accent-foreground: oklch(0.16 0.005 260);
+  --accent-soft: oklch(0.82 0.13 60);
+
+  /* gradients */
+  --gradient-warm: linear-gradient(135deg, oklch(0.78 0.17 32), oklch(0.84 0.14 68));
+  --gradient-warm-soft: linear-gradient(135deg, oklch(0.78 0.17 32 / 0.18), oklch(0.84 0.14 68 / 0.12));
+  --gradient-mesh: radial-gradient(120% 80% at 0% 0%, oklch(0.78 0.17 32 / 0.08) 0%, transparent 50%),
+                   radial-gradient(100% 70% at 100% 100%, oklch(0.55 0.18 280 / 0.06) 0%, transparent 55%);
+
+  /* premium shadow system */
+  --shadow-warm: 0 18px 56px -18px oklch(0.74 0.16 45 / 0.45);
+  --shadow-flat: 0 1px 0 0 oklch(1 0 0 / 0.04) inset;
+  --shadow-raised: 0 1px 0 0 oklch(1 0 0 / 0.05) inset, 0 8px 24px -12px oklch(0 0 0 / 0.5);
+  --shadow-popover: 0 1px 0 0 oklch(1 0 0 / 0.06) inset, 0 24px 60px -24px oklch(0 0 0 / 0.7);
+
+  /* focus ring */
+  --ring-warm: 0 0 0 3px oklch(0.76 0.16 42 / 0.28);
+
+  /* layout rails */
+  --shell-sidebar-w: 248px;
+  --shell-sidebar-collapsed: 72px;
+  --shell-topbar-h: 64px;
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  html, body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    background-image: var(--gradient-mesh);
+    background-attachment: fixed;
+  }
+  body {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv11", "ss01", "ss03";
+  }
+  ::selection { background: oklch(0.76 0.16 42 / 0.35); color: var(--foreground); }
+
+  /* global focus-visible ring — accessible, warm, non-jarring */
+  :where(a, button, [role="button"], input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: none;
+    box-shadow: var(--ring-warm);
+    border-radius: inherit;
+    transition: box-shadow 180ms ease-out;
+  }
+
+  /* respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* soft skeleton shimmer */
+@utility skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.04), transparent);
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+}
+@keyframes skeleton-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes neeklo-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.neeklo-marquee-track {
+  animation: neeklo-marquee 40s linear infinite;
+}
+.neeklo-marquee:hover .neeklo-marquee-track {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .neeklo-marquee-track { animation: none; }
+}
+
+/* ───────── responsive container ─────────
+   mobile  ≤ md  : 28rem (single-column phone width)
+   tablet  md→lg : 42rem
+   desktop lg+   : 56rem default
+*/
+@utility app-screen {
+  width: 100%;
+  max-width: 28rem;
+  margin-inline: auto;
+  @media (min-width: 768px) { max-width: 42rem; }
+  @media (min-width: 1024px) { max-width: 56rem; }
+}
+
+/* wider variant for grids / tables */
+@utility app-screen-wide {
+  width: 100%;
+  max-width: 28rem;
+  margin-inline: auto;
+  @media (min-width: 768px) { max-width: 48rem; }
+  @media (min-width: 1024px) { max-width: 72rem; }
+  @media (min-width: 1280px) { max-width: 80rem; }
+}
+
+/* bottom-tab safe area: mobile/tablet need space, desktop none */
+@utility app-pad-tab {
+  padding-bottom: 7rem;
+  @media (min-width: 1024px) { padding-bottom: 3rem; }
+}
+
+
+@utility gradient-border-warm {
+  position: relative;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    var(--gradient-warm) border-box;
+  border: 1px solid transparent;
+}
+
+@utility bg-gradient-warm {
+  background: var(--gradient-warm);
+}
+
+@utility bg-gradient-warm-soft {
+  background: var(--gradient-warm-soft);
+}
+
+@utility surface-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-flat);
+}
+@utility surface-raised {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-raised);
+}
+
+@utility ring-warm {
+  box-shadow: var(--ring-warm);
+}
+
+@utility no-scrollbar {
+  &::-webkit-scrollbar { display: none; }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* premium button defaults via utility */
+@utility btn-primary {
+  background: var(--gradient-warm);
+  color: var(--accent-foreground);
+  border-radius: 9999px;
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+  &:hover { box-shadow: var(--shadow-warm); }
+  &:active { transform: scale(0.985); }
+}
+@utility btn-secondary {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  border-radius: 9999px;
+  font-weight: 500;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  &:hover { border-color: var(--border-strong); background: var(--surface-3); }
+}
+
+/* ─────────── media-studio design tokens ─────────── */
+/* Radii: tile = 10px, card = 16px. Use as utilities. */
+@utility rounded-tile { border-radius: 10px; }
+@utility rounded-card { border-radius: 16px; }
+
+/* Reusable panel surface — tonal step over background, hairline border */
+@utility panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-flat);
+}
+@utility panel-raised {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-raised);
+}
+
+/* Standard transition window for the studio (150–250 ms) */
+@utility transition-studio {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}

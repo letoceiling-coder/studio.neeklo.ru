@@ -1,0 +1,251 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PlanId {
+  free
+  start
+  pro
+  studio
+  business
+}
+
+enum UserRole {
+  user
+  admin
+  superadmin
+}
+
+enum JobKind {
+  image
+  video
+  enhance
+  realtime
+  avatar
+  voice
+  site
+  assistant
+  parser
+}
+
+enum JobStatus {
+  queued
+  running
+  completed
+  failed
+  cancelled
+}
+
+enum SubscriptionStatus {
+  pending
+  active
+  past_due
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+  refunded
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         UserRole  @default(user)
+  telegramId   String?   @unique
+  avatarUrl    String?
+  planId       PlanId    @default(free)
+  credits      Int       @default(30)
+  onboarding   Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  refreshTokens RefreshToken[]
+  jobs          Job[]
+  assets        Asset[]
+  sites         Site[]
+  assistants    Assistant[]
+  spaces        Space[]
+  subscription  Subscription?
+  payments      Payment[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Job {
+  id            String    @id @default(cuid())
+  userId        String
+  kind          JobKind
+  status        JobStatus @default(queued)
+  progress      Float     @default(0)
+  cost          Int       @default(0)
+  input         Json
+  output        Json?
+  externalJobId String?
+  error         String?
+  createdAt     DateTime  @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([externalJobId])
+}
+
+model Asset {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String
+  mimeType  String
+  fileName  String
+  s3Key     String
+  size      Int
+  meta      Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind])
+}
+
+model Site {
+  id                 String   @id @default(cuid())
+  userId             String
+  title              String
+  slug               String
+  platformProjectSlug String?
+  publishedUrl       String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions           SiteVersion[]
+
+  @@unique([userId, slug])
+}
+
+model SiteVersion {
+  id        String   @id @default(cuid())
+  siteId    String
+  label     String
+  state     Json
+  runId     Int?
+  createdAt DateTime @default(now())
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId])
+}
+
+model Assistant {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  config    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents KbDocument[]
+  leads     Lead[]
+}
+
+model KbDocument {
+  id          String   @id @default(cuid())
+  assistantId String
+  title       String
+  content     String   @db.Text
+  createdAt   DateTime @default(now())
+  assistant   Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+
+  @@index([assistantId])
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  assistantId String
+  name        String?
+  contact     String?
+  message     String?
+  status      String   @default("new")
+  createdAt   DateTime @default(now())
+  assistant   Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+
+  @@index([assistantId, status])
+}
+
+model Subscription {
+  id               String             @id @default(cuid())
+  userId           String             @unique
+  planId           PlanId
+  cycle            String             @default("month")
+  status           SubscriptionStatus @default(pending)
+  provider         String
+  externalId       String?
+  currentPeriodEnd DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  userId     String
+  provider   String
+  externalId String?       @unique
+  amount     Int
+  currency   String        @default("RUB")
+  status     PaymentStatus @default(pending)
+  planId     PlanId
+  cycle      String        @default("month")
+  meta       Json?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model Space {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects  Project[]
+
+  @@index([userId])
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  spaceId   String
+  name      String
+  board     Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId])
+}
+
+// Произвольные настройки сайта (key/value). Например key="home" — контент главной.
+model SiteSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

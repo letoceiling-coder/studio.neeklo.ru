@@ -1,0 +1,17 @@
+[Unit]
+Description=Studio Neeklo Worker
+After=network.target docker.service studio-api.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/studio-neeklo/backend/apps/worker
+EnvironmentFile=/opt/studio-neeklo/backend/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npx tsx src/main.ts
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/studio-neeklo/worker.log
+StandardError=append:/var/log/studio-neeklo/worker.log
+
+[Install]
+WantedBy=multi-user.target
