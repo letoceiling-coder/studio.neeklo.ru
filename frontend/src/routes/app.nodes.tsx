@@ -119,6 +119,8 @@ type NodeData = {
   format?: string;
   src?: string;
   note?: string;
+  w?: number;
+  h?: number;
 };
 
 type WFNode = {
@@ -192,7 +194,7 @@ const CATALOG: NodeDef[] = [
   // INPUT / OUTPUT
   { kind: "import", label: "Import", desc: "Импорт из файла / URL", icon: Upload, accent: "#7CC4A3", category: "io", inputs: [], outputs: [P("out", "any", "Данные")] },
   { kind: "export", label: "Export", desc: "Сохранить в медиабанк", icon: Download, accent: "#5A8DEE", category: "io", runnable: true, inputs: [P("in", "any", "Вход")], outputs: [] },
-  { kind: "use-in", label: "Использовать в", desc: "Передать в другой инструмент", icon: ArrowRightLeft, accent: "#A78BFA", category: "io", inputs: [P("image", "image", "Изобр."), P("video", "video", "Видео")], outputs: [] },
+  { kind: "use-in", label: "Использовать в", desc: "Передать в другой инструмент", icon: ArrowRightLeft, accent: "#A78BFA", category: "io", runnable: true, inputs: [P("image", "image", "Изобр."), P("video", "video", "Видео")], outputs: [] },
 ];
 
 const STICKY_DEF: NodeDef = {
@@ -206,8 +208,19 @@ const STICKY_DEF: NodeDef = {
   outputs: [],
 };
 
+const FRAME_DEF: NodeDef = {
+  kind: "frame",
+  label: "Фрейм",
+  desc: "Группа нод",
+  icon: Frame,
+  accent: "#9aa0a6",
+  category: "utility",
+  inputs: [],
+  outputs: [],
+};
+
 const DEF_MAP: Record<string, NodeDef> = Object.fromEntries(
-  [...CATALOG, STICKY_DEF].map((d) => [d.kind, d]),
+  [...CATALOG, STICKY_DEF, FRAME_DEF].map((d) => [d.kind, d]),
 );
 
 function getDef(kind: string): NodeDef {
@@ -255,9 +268,15 @@ function nodeBodyHeight(def: NodeDef) {
 }
 
 function nodeHeight(node: WFNode) {
+  if (node.kind === "frame") return node.data.h ?? 240;
   if (node.kind === "sticky") return 120;
   const def = getDef(node.kind);
   return HEADER_H + nodeBodyHeight(def) + (hasPreview(node) ? PREVIEW_H : 0);
+}
+
+function nodeWidth(node: WFNode) {
+  if (node.kind === "frame") return node.data.w ?? 340;
+  return NODE_W;
 }
 
 function portY(node: WFNode, def: NodeDef, side: "in" | "out", portId: string) {
@@ -588,6 +607,7 @@ function Editor({ initial, onBack }: { initial?: Graph; onBack: () => void }) {
   const scaleRef = useRef(scale);
   const spaceRef = useRef(false);
   const dragRef = useRef<{ startWorld: { x: number; y: number }; base: Map<string, { x: number; y: number }> } | null>(null);
+  const resizeRef = useRef<{ id: string; startWorld: { x: number; y: number }; baseW: number; baseH: number } | null>(null);
   const panGestureRef = useRef<{ sx: number; sy: number; base: { x: number; y: number } } | null>(null);
   const marqueeRef = useRef<{ x0: number; y0: number } | null>(null);
   const undoRef = useRef<Graph[]>([]);
@@ -702,7 +722,14 @@ function Editor({ initial, onBack }: { initial?: Graph; onBack: () => void }) {
         x: world.x - NODE_W / 2,
         y: world.y - 40,
         status: "idle",
-        data: kind === "sticky" ? { note: "Заметка…" } : kind.startsWith("gen-") ? { modelId: (kind === "gen-image" ? imageModels() : videoModels())[0]?.id } : {},
+        data:
+          kind === "sticky"
+            ? { note: "Заметка…" }
+            : kind === "frame"
+              ? { note: "Фрейм", w: 360, h: 260 }
+              : kind.startsWith("gen-")
+                ? { modelId: (kind === "gen-image" ? imageModels() : videoModels())[0]?.id }
+                : {},
       };
       setNodes((prev) => [...prev, n]);
       setSelectedIds([n.id]);
@@ -863,7 +890,7 @@ function Editor({ initial, onBack }: { initial?: Graph; onBack: () => void }) {
     for (const n of ns) {
       minX = Math.min(minX, n.x);
       minY = Math.min(minY, n.y);
-      maxX = Math.max(maxX, n.x + NODE_W);
+      maxX = Math.max(maxX, n.x + nodeWidth(n));
       maxY = Math.max(maxY, n.y + nodeHeight(n));
     }
     const pad = 80;
@@ -893,6 +920,18 @@ function Editor({ initial, onBack }: { initial?: Graph; onBack: () => void }) {
       if (selection.includes(node.id)) base.set(node.id, { x: node.x, y: node.y });
     }
     if (!base.has(n.id)) base.set(n.id, { x: n.x, y: n.y });
+    // фреймы тянут за собой вложенные ноды
+    for (const fr of nodesRef.current) {
+      if (fr.kind !== "frame" || !base.has(fr.id)) continue;
+      const fw = nodeWidth(fr);
+      const fh = nodeHeight(fr);
+      for (const child of nodesRef.current) {
+        if (child.kind === "frame" || base.has(child.id)) continue;
+        const cx = child.x + nodeWidth(child) / 2;
+        const cy = child.y + nodeHeight(child) / 2;
+        if (cx >= fr.x && cx <= fr.x + fw && cy >= fr.y && cy <= fr.y + fh) base.set(child.id, { x: child.x, y: child.y });
+      }
+    }
     dragRef.current = { startWorld, base };
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   };
@@ -917,6 +956,13 @@ function Editor({ initial, onBack }: { initial?: Graph; onBack: () => void }) {
     const w = screenToWorld(e.clientX, e.clientY);
     setMouseWorld(w);
 
+    if (resizeRef.current) {
+      const r = resizeRef.current;
+      const nw = Math.max(180, r.baseW + (w.x - r.startWorld.x));
+      const nh = Math.max(120, r.baseH + (w.y - r.startWorld.y));
+      setNodes((prev) => prev.map((n) => (n.id === r.id ? { ...n, data: { ...n.data, w: nw, h: nh } } : n)));
+      return;
+    }
     if (dragRef.current) {
       const d = dragRef.current;
       const dx = w.x - d.startWorld.x;
@@ -943,6 +989,7 @@ function Editor({ initial, onBack }: { initial?: Graph; onBack: () => void }) {
   const onCanvasPointerUp = () => {
     dragRef.current = null;
     panGestureRef.current = null;
+    resizeRef.current = null;
 
     if (connectFrom && hoverIn) {
       if (typesCompatible(connectFrom.type, hoverIn.type)) {
@@ -960,7 +1007,7 @@ function Editor({ initial, onBack }: { initial?: Graph; onBack: () => void }) {
       const y1 = Math.max(marquee.y0, marquee.y1);
       if (Math.abs(x1 - x0) > 6 || Math.abs(y1 - y0) > 6) {
         const hit = nodesRef.current
-          .filter((n) => n.x + NODE_W > x0 && n.x < x1 && n.y + nodeHeight(n) > y0 && n.y < y1)
+          .filter((n) => n.x + nodeWidth(n) > x0 && n.x < x1 && n.y + nodeHeight(n) > y0 && n.y < y1)
           .map((n) => n.id);
         setSelectedIds((prev) => Array.from(new Set([...prev, ...hit])));
       }
@@ -980,6 +1027,14 @@ function Editor({ initial, onBack }: { initial?: Graph; onBack: () => void }) {
     setConnectFrom({ nodeId: node.id, portId: port.id, type: port.type });
   };
 
+  /* ───── frame resize ───── */
+  const onFrameResizeDown = (e: ReactPointerEvent<HTMLDivElement>, node: WFNode) => {
+    e.stopPropagation();
+    pushHistory();
+    resizeRef.current = { id: node.id, startWorld: screenToWorld(e.clientX, e.clientY), baseW: nodeWidth(node), baseH: nodeHeight(node) };
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
   /* ───── execution (§6.5) ───── */
   const setStatus = (id: string, status: NodeStatus, progress?: number, error?: string) =>
     patchNode(id, { status, progress, error });
@@ -988,15 +1043,19 @@ function Editor({ initial, onBack }: { initial?: Graph; onBack: () => void }) {
     const incoming = edgesRef.current.filter((e) => e.to === node.id);
     const prompts: string[] = [];
     let src: string | undefined;
+    let srcType: PortType | undefined;
     for (const e of incoming) {
       const s = nodesRef.current.find((n) => n.id === e.from);
       if (!s) continue;
       const sdef = getDef(s.kind);
       const outPort = sdef.outputs.find((p) => p.id === e.fromPort);
       if (outPort?.type === "text" && s.data.text) prompts.push(s.data.text);
-      if ((outPort?.type === "image" || outPort?.type === "video") && s.data.src) src = src ?? s.data.src;
+      if ((outPort?.type === "image" || outPort?.type === "video") && s.data.src && !src) {
+        src = s.data.src;
+        srcType = outPort.type;
+      }
     }
-    return { prompt: prompts.join("\n") || undefined, src };
+    return { prompt: prompts.join("\n") || undefined, src, srcType };
   };
 
   const buildInput = (node: WFNode, jobKind: JobKind, prompt: string, src?: string): Record<string, unknown> => {
@@ -1034,6 +1093,47 @@ function Editor({ initial, onBack }: { initial?: Graph; onBack: () => void }) {
     if (!def.runnable || node.kind === "sticky") return true;
 
     const inputs = gatherInputs(node);
+
+    // терминальные ноды ввода/вывода — без кредитов, с реальным эффектом
+    if (node.kind === "export" || node.kind === "use-in") {
+      if (!inputs.src) {
+        toast.error(`${def.label}: нет входного ассета`);
+        setStatus(id, "error", 0, "Нет входа");
+        return false;
+      }
+      setStatus(id, "running", 40);
+      await new Promise((r) => window.setTimeout(r, 280));
+      if (node.kind === "export") {
+        addMedia({
+          kind: inputs.srcType === "video" ? "video" : "photo",
+          title: node.title || "Экспорт",
+          ratio: (node.data.format as MediaItem["ratio"]) || "1:1",
+          gradient: pickGradient(),
+          src: inputs.src.startsWith("http") ? inputs.src : undefined,
+        });
+        toast.success("Сохранено в медиабанк");
+      } else {
+        try {
+          sessionStorage.setItem("neeklo:handoff", JSON.stringify({ src: inputs.src, type: inputs.srcType }));
+        } catch {
+          /* ignore */
+        }
+        if (inputs.src.startsWith("http")) {
+          try {
+            await navigator.clipboard.writeText(inputs.src);
+            toast.success("Ссылка на ассет скопирована");
+          } catch {
+            toast.success("Ассет подготовлен к передаче");
+          }
+        } else {
+          toast.success("Ассет подготовлен к передаче");
+        }
+      }
+      patchNode(id, { status: "done", progress: 100, error: undefined });
+      patchNodeData(id, { src: inputs.src });
+      return true;
+    }
+
     const prompt = inputs.prompt ?? node.data.text ?? "";
     if ((node.kind === "gen-image" || node.kind === "gen-video") && !prompt && !inputs.src) {
       toast.error(`${def.label}: нужен промпт или входной ассет`);
@@ -1289,7 +1389,7 @@ function Editor({ initial, onBack }: { initial?: Graph; onBack: () => void }) {
           <div className="my-0.5 h-px bg-border" />
           <ToolBtn icon={Plus} label="Добавить ноду (N)" onClick={() => setCatalog({ tab: "nodes" })} />
           <ToolBtn icon={StickyNote} label="Заметка" onClick={() => addNode("sticky")} />
-          <ToolBtn icon={Frame} label="Фрейм (скоро)" onClick={() => toast("Фреймы скоро")} />
+          <ToolBtn icon={Frame} label="Фрейм" onClick={() => addNode("frame")} />
           <ToolBtn icon={Boxes} label="Ассеты" onClick={() => setCatalog({ tab: "assets" })} />
         </div>
 
@@ -1365,10 +1465,14 @@ function Editor({ initial, onBack }: { initial?: Graph; onBack: () => void }) {
                 </g>
               </svg>
 
-              {/* nodes */}
+              {/* nodes (frames render first → behind) */}
               <div className="absolute inset-0" style={{ transform, transformOrigin: "0 0" }}>
-                {nodes.map((n) =>
-                  n.kind === "sticky" ? (
+                {[...nodes]
+                  .sort((a, b) => (a.kind === "frame" ? 0 : 1) - (b.kind === "frame" ? 0 : 1))
+                  .map((n) =>
+                  n.kind === "frame" ? (
+                    <FrameCard key={n.id} node={n} selected={selectedIds.includes(n.id)} onPointerDown={(e) => onNodePointerDown(e, n)} onTitle={(note) => patchNodeData(n.id, { note })} onDelete={() => deleteNodes([n.id])} onResizeDown={(e) => onFrameResizeDown(e, n)} />
+                  ) : n.kind === "sticky" ? (
                     <StickyCard key={n.id} node={n} selected={selectedIds.includes(n.id)} onPointerDown={(e) => onNodePointerDown(e, n)} onChange={(note) => patchNodeData(n.id, { note })} onDelete={() => deleteNodes([n.id])} />
                   ) : (
                     <NodeCard
@@ -1706,6 +1810,51 @@ function StickyCard({
   );
 }
 
+/* ───────────────────────── frame card ───────────────────────── */
+
+function FrameCard({
+  node,
+  selected,
+  onPointerDown,
+  onTitle,
+  onDelete,
+  onResizeDown,
+}: {
+  node: WFNode;
+  selected: boolean;
+  onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  onTitle: (note: string) => void;
+  onDelete: () => void;
+  onResizeDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
+}) {
+  const w = node.data.w ?? 340;
+  const h = node.data.h ?? 240;
+  return (
+    <div
+      className={cn("absolute rounded-tile border-2 border-dashed", selected ? "border-accent" : "border-border")}
+      style={{ left: node.x, top: node.y, width: w, height: h, background: "color-mix(in oklab, var(--foreground) 3%, transparent)", cursor: "grab" }}
+      onPointerDown={onPointerDown}
+    >
+      <div className="flex items-center gap-1.5 px-2 h-7">
+        <Frame className="w-3.5 h-3.5 shrink-0 text-foreground/50" />
+        <input
+          value={node.data.note ?? ""}
+          onChange={(e) => onTitle(e.target.value)}
+          onPointerDown={(e) => e.stopPropagation()}
+          placeholder="Фрейм"
+          className="flex-1 min-w-0 bg-transparent text-[12px] font-medium outline-none focus:bg-foreground/5 rounded px-1"
+        />
+        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onDelete(); }} className="shrink-0 text-foreground/40 hover:text-red-500">
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div onPointerDown={onResizeDown} className="absolute bottom-0 right-0 w-5 h-5 cursor-nwse-resize" title="Изменить размер">
+        <div className="absolute bottom-1 right-1 w-2.5 h-2.5 border-r-2 border-b-2 border-foreground/40" />
+      </div>
+    </div>
+  );
+}
+
 /* ───────────────────────── catalog panel (§6.3) ───────────────────────── */
 
 function CatalogPanel({
@@ -2007,7 +2156,7 @@ function Minimap({
   for (const n of nodes) {
     minX = Math.min(minX, n.x);
     minY = Math.min(minY, n.y);
-    maxX = Math.max(maxX, n.x + NODE_W);
+    maxX = Math.max(maxX, n.x + nodeWidth(n));
     maxY = Math.max(maxY, n.y + nodeHeight(n));
   }
   const pad = 60;
@@ -2037,7 +2186,7 @@ function Minimap({
       <svg width={MW} height={MH} onClick={onClick} className="cursor-pointer">
         <g transform={`translate(${-minX * s}, ${-minY * s}) scale(${s})`}>
           {nodes.map((n) => (
-            <rect key={n.id} x={n.x} y={n.y} width={NODE_W} height={nodeHeight(n)} rx={8} fill="color-mix(in oklab, var(--foreground) 22%, transparent)" />
+            <rect key={n.id} x={n.x} y={n.y} width={nodeWidth(n)} height={nodeHeight(n)} rx={8} fill={n.kind === "frame" ? "color-mix(in oklab, var(--foreground) 8%, transparent)" : "color-mix(in oklab, var(--foreground) 22%, transparent)"} />
           ))}
           <rect x={viewX} y={viewY} width={viewW} height={viewH} fill="color-mix(in oklab, var(--accent) 10%, transparent)" stroke="var(--accent)" strokeWidth={2 / s} />
         </g>
